@@ -31,7 +31,7 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("Fleet Routing & Dynamic Re-Optimisation")
+st.title("Driver-Break Constrained Fleet Routing and Compliance Decision Platform")
 st.caption("Interactive CPU-based routing and disruption simulator")
 
 
@@ -165,7 +165,7 @@ def get_customer_options(
         ):
             continue
 
-        if disruption_type == "Urgent delivery":
+        if disruption_type == "Urgent delivery: existing order":
             if customer_id in already_urgent:
                 continue
 
@@ -273,7 +273,10 @@ def perform_reoptimization(
     )
 
     # Validate customer actions against the latest simulation state.
-    if disruption_type == "Customer cancellation":
+    if disruption_type in {
+        "Customer cancellation",
+        "Urgent delivery: existing order",
+    }:
         if selected_customer is None:
             st.error("Select an eligible customer.")
             return False
@@ -303,6 +306,14 @@ def perform_reoptimization(
             )
             return False
 
+        if (
+            disruption_type == "Urgent delivery: existing order"
+            and selected_customer
+            in set(st.session_state["urgent_customers"])
+        ):
+            st.error("That customer has already been prioritised.")
+            return False
+        
     # Validate vehicle actions against the latest simulation state.
     if disruption_type in {"Vehicle delay", "Vehicle breakdown"}:
         if selected_vehicle is None:
@@ -323,6 +334,7 @@ def perform_reoptimization(
             )
             return False
 
+    
     # Apply the incident.
     if disruption_type == "Customer cancellation":
         customers = cancel_customer(customers, selected_customer)
@@ -331,21 +343,21 @@ def perform_reoptimization(
         description = f"Customer {selected_customer} cancelled"
         customer_id = selected_customer
 
-    # elif disruption_type == "Urgent delivery":
-    #     demand = int(
-    #         customers.loc[
-    #             customers["customer_id"] == selected_customer,
-    #             "demand",
-    #         ].iloc[0]
-    #     )
+    elif disruption_type == "Urgent delivery: existing order":
+        demand = int(
+            customers.loc[
+                customers["customer_id"] == selected_customer,
+                "demand",
+            ].iloc[0]
+        )
 
-    #     description = (
-    #         f"Existing customer {selected_customer} prioritised "
-    #         f"(demand {demand})"
-    #     )
-    #     customer_id = selected_customer
+        description = (
+            f"Existing customer {selected_customer} prioritised "
+            f"(demand {demand})"
+        )
+        customer_id = selected_customer
 
-    elif disruption_type == "Urgent delivery":
+    elif disruption_type == "Urgent delivery: new order":
         next_number = st.session_state["urgent_counter"] + 1
 
         customers, urgent_customer = add_urgent_customer(
@@ -358,8 +370,9 @@ def perform_reoptimization(
         st.session_state["urgent_counter"] = int(
             urgent_customer["customer_id"].split("_")[-1]
         )
+
         description = (
-            f"Urgent delivery {urgent_customer['customer_id']} added "
+            f"New urgent order {urgent_customer['customer_id']} added "
             f"(demand {urgent_customer['demand']})"
         )
         customer_id = urgent_customer["customer_id"]
@@ -381,6 +394,7 @@ def perform_reoptimization(
     else:
         st.error("Unknown disruption type.")
         return False
+
 
     event = create_disruption(
         disruption_type=disruption_type,
@@ -410,7 +424,10 @@ def perform_reoptimization(
         unavailable_vehicles=unavailable,
         urgent_customer_id=(
             customer_id
-            if disruption_type == "Urgent delivery"
+            if disruption_type in {
+                "Urgent delivery: existing order",
+                "Urgent delivery: new order",
+            }
             else None
         ),
         time_limit_seconds=5,
@@ -508,7 +525,10 @@ def perform_reoptimization(
         "runtime_seconds"
     ]
 
-    if disruption_type == "Urgent delivery":
+    if disruption_type in {
+        "Urgent delivery: existing order",
+        "Urgent delivery: new order",
+    }:
         st.session_state["urgent_customers"].append(customer_id)
 
     # Stay paused. Resuming requires an explicit user action.
@@ -733,7 +753,8 @@ if solution and solution["status"] == "Success" and simulation:
             [
                 "Vehicle delay",
                 "Vehicle breakdown",
-                "Urgent delivery",
+                "Urgent delivery: existing order",
+                "Urgent delivery: new order",
                 "Customer cancellation",
             ],
             key="active_disruption_type",
@@ -766,7 +787,10 @@ if solution and solution["status"] == "Success" and simulation:
                     "that can be disrupted."
                 )
 
-        if disruption_type == "Customer cancellation":
+        if disruption_type in {
+            "Customer cancellation",
+            "Urgent delivery: existing order",
+        }:
             customer_options = get_customer_options(
                 customers,
                 simulation,
@@ -777,7 +801,7 @@ if solution and solution["status"] == "Success" and simulation:
             if customer_options:
                 label = (
                     "Customer to prioritise"
-                    if disruption_type == "Urgent delivery"
+                    if disruption_type == "Urgent delivery: existing order"
                     else "Customer to cancel"
                 )
 
@@ -805,8 +829,11 @@ if solution and solution["status"] == "Success" and simulation:
             selected_vehicle is not None
             if disruption_type in {"Vehicle delay", "Vehicle breakdown"}
             else selected_customer is not None
-            if disruption_type == "Customer cancellation"
-            else disruption_type == "Urgent delivery"
+            if disruption_type in {
+                "Customer cancellation",
+                "Urgent delivery: existing order",
+            }
+            else disruption_type == "Urgent delivery: new order"
         )
 
         if st.button(
