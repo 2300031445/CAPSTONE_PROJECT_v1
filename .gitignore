@@ -41,7 +41,3 @@ Desktop.ini
 
 # Jupyter
 .ipynb_checkpoints/
-
-# Generated data
-# Uncomment this if data/ contains generated files
-# data/
