@@ -302,3 +302,54 @@ def test_merge_does_not_shift_absolute_schedules():
     )
 
     assert merged["schedules"][0]["duration_minutes"] == 720
+
+def test_merge_does_not_overwrite_completed_customer_history():
+    from src.simulation import merge_reoptimized_simulation
+
+    old_simulation = {
+        "schedules": [],
+        "service_events": {
+            "C001": {
+                "arrival": 10,
+                "service_start": 10,
+                "service_end": 20,
+                "vehicle_id": "V01",
+            }
+        },
+    }
+
+    new_simulation = {
+        "schedules": [],
+        "service_events": {
+            "C001": {
+                "arrival": 30,
+                "service_start": 30,
+                "service_end": 40,
+                "vehicle_id": "V02",
+            },
+            "C002": {
+                "arrival": 35,
+                "service_start": 35,
+                "service_end": 45,
+                "vehicle_id": "V02",
+            },
+        },
+    }
+
+    customers = pd.DataFrame([
+        {"customer_id": "C001"},
+        {"customer_id": "C002"},
+    ])
+
+    result = merge_reoptimized_simulation(
+        old_simulation=old_simulation,
+        new_simulation=new_simulation,
+        customers=customers,
+        current_minute=25,
+        schedules_are_absolute=True,
+    )
+
+    assert result["service_events"]["C001"]["vehicle_id"] == "V01"
+    assert result["service_events"]["C001"]["service_end"] == 20
+
+    assert "C002" in result["service_events"]

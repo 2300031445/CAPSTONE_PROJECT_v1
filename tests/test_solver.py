@@ -3,7 +3,6 @@ import pandas as pd
 
 from src.solver import solve_cvrp
 
-
 def make_scenario(vehicle_capacity=20, demands=(3, 4)):
     depot = {
         "depot_id": "DEPOT_0",
@@ -345,4 +344,40 @@ def test_solver_rejects_route_that_cannot_finish_within_shift():
     )
 
     assert result["status"] != "Success"
+    assert result["routes"] == []
+
+def test_urgent_customer_is_first_stop():
+    depot, vehicles, customers = make_scenario()
+
+    result = solve_cvrp(
+        depot=depot,
+        vehicles=vehicles,
+        customers=customers,
+        urgent_customer_id="C002",
+    )
+
+    assert result["status"] == "Success"
+
+    urgent_routes = [
+        route
+        for route in result["routes"]
+        if "C002" in route["customer_stops"]
+    ]
+
+    assert len(urgent_routes) == 1
+    assert urgent_routes[0]["customer_stops"][0] == "C002"
+
+def test_unknown_urgent_customer_returns_clear_error():
+    depot, vehicles, customers = make_scenario()
+
+    result = solve_cvrp(
+        depot=depot,
+        vehicles=vehicles,
+        customers=customers,
+        urgent_customer_id="UNKNOWN",
+    )
+
+    assert result["status"] == (
+        "Urgent customer UNKNOWN was not found"
+    )
     assert result["routes"] == []

@@ -367,3 +367,135 @@ def test_vehicle_available_time_includes_remaining_service():
     # C001's service ends at minute 15.
     # At minute 10, the vehicle has 5 minutes of service remaining.
     assert state["current_time"] == 15
+
+
+def test_reoptimization_passes_urgent_customer_id_to_solver(
+    monkeypatch,
+):
+    import src.reoptimization as reoptimization
+
+    depot, vehicles, customers, simulation = make_inputs()
+    captured = {}
+
+    def fake_solve_cvrp(**kwargs):
+        captured.update(kwargs)
+        return {"status": "Success", "routes": []}
+
+    monkeypatch.setattr(
+        reoptimization,
+        "solve_cvrp",
+        fake_solve_cvrp,
+    )
+
+    result = reoptimization.reoptimize_remaining(
+        depot,
+        vehicles,
+        customers,
+        simulation,
+        current_minute=20,
+        urgent_customer_id="C002",
+    )
+
+    assert captured["urgent_customer_id"] == "C002"
+    assert "C002" in set(
+        result["remaining_customers"]["customer_id"]
+    )
+
+
+def test_reoptimization_passes_no_urgent_customer_by_default(
+    monkeypatch,
+):
+    import src.reoptimization as reoptimization
+
+    depot, vehicles, customers, simulation = make_inputs()
+    captured = {}
+
+    def fake_solve_cvrp(**kwargs):
+        captured.update(kwargs)
+        return {"status": "Success", "routes": []}
+
+    monkeypatch.setattr(
+        reoptimization,
+        "solve_cvrp",
+        fake_solve_cvrp,
+    )
+
+    reoptimization.reoptimize_remaining(
+        depot,
+        vehicles,
+        customers,
+        simulation,
+        current_minute=20,
+    )
+
+    assert captured["urgent_customer_id"] is None
+
+def test_cancelled_customer_is_not_passed_to_solver(monkeypatch):
+    import src.reoptimization as reoptimization
+
+    depot, vehicles, customers, simulation = make_inputs()
+    customers = customers[
+        customers["customer_id"] != "C002"
+    ].copy()
+
+    captured = {}
+
+    def fake_solve_cvrp(**kwargs):
+        captured.update(kwargs)
+        return {"status": "Success", "routes": []}
+
+    monkeypatch.setattr(
+        reoptimization,
+        "solve_cvrp",
+        fake_solve_cvrp,
+    )
+
+    result = reoptimization.reoptimize_remaining(
+        depot,
+        vehicles,
+        customers,
+        simulation,
+        current_minute=20,
+    )
+
+    assert "C002" not in set(
+        result["remaining_customers"]["customer_id"]
+    )
+    assert "C002" not in set(
+        captured["customers"]["customer_id"]
+    )
+
+def test_cancelled_customer_is_not_passed_to_solver(monkeypatch):
+    import src.reoptimization as reoptimization
+
+    depot, vehicles, customers, simulation = make_inputs()
+    customers = customers[
+        customers["customer_id"] != "C002"
+    ].copy()
+
+    captured = {}
+
+    def fake_solve_cvrp(**kwargs):
+        captured.update(kwargs)
+        return {"status": "Success", "routes": []}
+
+    monkeypatch.setattr(
+        reoptimization,
+        "solve_cvrp",
+        fake_solve_cvrp,
+    )
+
+    result = reoptimization.reoptimize_remaining(
+        depot,
+        vehicles,
+        customers,
+        simulation,
+        current_minute=20,
+    )
+
+    assert "C002" not in set(
+        result["remaining_customers"]["customer_id"]
+    )
+    assert "C002" not in set(
+        captured["customers"]["customer_id"]
+    )

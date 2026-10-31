@@ -206,3 +206,34 @@ def test_cancel_unknown_customer_raises_value_error():
         match="Customer C999 does not exist",
     ):
         cancel_customer(customers, "C999")
+
+def test_cancel_customer_removes_only_selected_customer():
+    import pandas as pd
+
+    from src.disruptions import cancel_customer
+
+    customers = pd.DataFrame([
+        {"customer_id": "C001", "demand": 3},
+        {"customer_id": "C002", "demand": 4},
+        {"customer_id": "C003", "demand": 2},
+    ])
+
+    result = cancel_customer(customers, "C002")
+
+    assert result["customer_id"].tolist() == ["C001", "C003"]
+    assert customers["customer_id"].tolist() == ["C001", "C002", "C003"]
+
+def test_cancel_customer_removes_only_selected_customer():
+    import pandas as pd
+    from src.disruptions import cancel_customer
+
+    customers = pd.DataFrame([
+        {"customer_id": "C001", "demand": 3},
+        {"customer_id": "C002", "demand": 4},
+        {"customer_id": "C003", "demand": 2},
+    ])
+
+    result = cancel_customer(customers, "C002")
+
+    assert result["customer_id"].tolist() == ["C001", "C003"]
+    assert customers["customer_id"].tolist() == ["C001", "C002", "C003"]

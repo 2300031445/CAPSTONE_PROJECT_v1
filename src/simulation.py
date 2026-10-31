@@ -216,7 +216,15 @@ def merge_reoptimized_simulation(
         and customer_id in current_customer_ids
     }
 
-    merged_events.update(new_simulation["service_events"])
+    # Do not schedule completed or currently serviced customers again.
+    revised_events = {
+        customer_id: event_data
+        for customer_id, event_data
+        in new_simulation["service_events"].items()
+        if customer_id not in protected_customers
+    }
+
+    merged_events.update(revised_events)    
     new_simulation["service_events"] = merged_events
 
     new_simulation["duration_minutes"] = max(
